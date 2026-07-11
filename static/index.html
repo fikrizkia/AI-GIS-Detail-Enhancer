@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI GIS & Satellite Map Detail Upscaler</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=Outfit:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f17;
+            --card-bg: rgba(20, 26, 38, 0.65);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --card-border-hover: rgba(79, 172, 254, 0.4);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-primary: #00f2fe;
+            --accent-secondary: #4facfe;
+            --accent-gradient: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            --glow-color: rgba(0, 242, 254, 0.15);
+            --error-color: #ef4444;
+            --success-color: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Background grid effect */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: radial-gradient(rgba(79, 172, 254, 0.05) 1px, transparent 0);
+            background-size: 24px 24px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        header {
+            padding: 24px 40px;
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(11, 15, 23, 0.8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-section h1 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 1.8rem;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-section p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 2px;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--success-color);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--success-color);
+            box-shadow: 0 0 8px var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        main {
+            flex: 1;
+            padding: 30px 40px;
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 30px;
+            max-width: 1800px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            backdrop-filter: blur(16px);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            transition: all 0.3s ease;
+            height: fit-content;
+        }
+
+        .panel:hover {
+            border-color: rgba(79, 172, 254, 0.2);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--accent-primary);
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .select-input {
+            width: 100%;
+            background-color: #111520;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+            cursor: pointer;
+        }
+
+        .select-input:focus {
+            border-color: var(--accent-secondary);
+        }
+
+        .image-meta-card {
+            background-color: #111520;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .meta-label {
+            color: var(--text-secondary);
+        }
+
+        .meta-val {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Segmented control for Scale */
+        .scale-options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            background: #111520;
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+        }
+
+        .scale-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .scale-btn.active {
+            background: var(--accent-gradient);
+            color: #000;
+            box-shadow: 0 2px 10px rgba(0, 242, 254, 0.25);
+        }
+
+        .advanced-toggle {
+            font-size: 0.8rem;
+            color: var(--accent-secondary);
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 500;
+        }
+
+        .advanced-panel {
+            background-color: rgba(17, 21, 32, 0.5);
+            border: 1px dashed var(--card-border);
+            border-radius: 8px;
+            padding: 12px;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .slider-input {
+            width: 100%;
+            accent-color: var(--accent-primary);
+            cursor: pointer;
+        }
+
+        .execute-btn {
+            background: var(--accent-gradient);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            padding: 14px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 1.05rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px var(--glow-color);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .execute-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 242, 254, 0.4);
+            color: #fff;
+        }
+
+        .execute-btn:disabled {
+            background: #202635;
+            color: #64748b;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Right Viewer Panel */
+        .viewer-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            backdrop-filter: blur(16px);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-height: 500px;
+            position: relative;
+        }
+
+        /* Tabs header */
+        .tabs-header {
+            display: flex;
+            border-bottom: 1px solid var(--card-border);
+            gap: 20px;
+        }
+
+        .tab-link {
+            padding: 10px 4px;
+            color: var(--text-secondary);
+            background: none;
+            border: none;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            margin-bottom: -1px;
+        }
+
+        .tab-link:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-link.active {
+            color: var(--accent-primary);
+            border-bottom-color: var(--accent-primary);
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-radius: 12px;
+            border: 1px solid var(--card-border);
+            background-color: rgba(0, 0, 0, 0.2);
+            min-height: 400px;
+            position: relative;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 60vh;
+            object-fit: contain;
+            border-radius: 8px;
+            user-select: none;
+        }
+
+        /* Loader Overlay */
+        .loader-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 15, 23, 0.9);
+            z-index: 10;
+            border-radius: 16px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(0, 242, 254, 0.1);
+            border-top: 4px solid var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 1.2rem;
+            color: var(--text-primary);
+        }
+
+        .loader-status {
+            font-size: 0.9rem;
+            color: var(--accent-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(79, 172, 254, 0.1);
+            border: 1px solid rgba(79, 172, 254, 0.2);
+            padding: 4px 12px;
+            border-radius: 6px;
+        }
+
+        .loader-timer {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            font-weight: bold;
+        }
+
+        /* Success banner & download box */
+        .download-box {
+            display: none;
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .download-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .download-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--success-color);
+        }
+
+        .download-meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+            color: #fff;
+        }
+
+        /* Side-by-side comparison layout */
+        .comparison-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            width: 100%;
+            padding: 16px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .comp-pane {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .comp-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .comp-box {
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            overflow: hidden;
+            width: 100%;
+            background-color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .comp-img {
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--card-border);
+            background: rgba(11, 15, 23, 0.8);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-section">
+            <h1>🛰️ AI GIS Detail Enhancer</h1>
+            <p>High-Performance Local Image Upscaling Dashboard</p>
+        </div>
+        <div class="system-status">
+            <span class="status-dot"></span>
+            <span>FASTAPI SERVER: RUNNING</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Left configuration panel -->
+        <div class="panel">
+            <div class="section-title">
+                <span>⚙️ Configuration</span>
+            </div>
+
+            <!-- Image input selection -->
+            <div class="form-group">
+                <label for="image-select">Select Input Image</label>
+                <select id="image-select" class="select-input">
+                    <option value="">Loading images...</option>
+                </select>
+            </div>
+
+            <!-- Metadata view -->
+            <div id="meta-container" class="image-meta-card" style="display: none;">
+                <div class="meta-row">
+                    <span class="meta-label">Resolution:</span>
+                    <span id="meta-res" class="meta-val">-</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Aspect Ratio:</span>
+                    <span id="meta-ratio" class="meta-val">-</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Format:</span>
+                    <span id="meta-format" class="meta-val">-</span>
+                </div>
+            </div>
+
+            <!-- Algorithm selection -->
+            <div class="form-group">
+                <label for="algo-select">Upscaling Algorithm</label>
+                <select id="algo-select" class="select-input">
+                    <option value="realesrgan">Real-ESRGAN (Highest Detail - GAN)</option>
+                    <option value="edsr">EDSR (High Quality - CNN)</option>
+                    <option value="fsrcnn">FSRCNN (Fast AI - CNN)</option>
+                    <option value="lanczos">Pillow Lanczos (Classic Resampling)</option>
+                </select>
+            </div>
+
+            <!-- Scale Factor -->
+            <div class="form-group">
+                <label>Upscale Scale Factor</label>
+                <div class="scale-options">
+                    <button class="scale-btn active" data-scale="4">4x</button>
+                    <button class="scale-btn" data-scale="2">2x</button>
+                    <button class="scale-btn" data-scale="3">3x</button>
+                </div>
+            </div>
+
+            <!-- Advanced Toggle -->
+            <div class="advanced-toggle" id="adv-toggle">
+                <span>▶ Advanced Parameters (Tiling)</span>
+            </div>
+
+            <div class="advanced-panel" id="adv-panel">
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <label for="tile-slider">Tile Size</label>
+                        <span id="tile-val">200 px</span>
+                    </div>
+                    <input type="range" id="tile-slider" class="slider-input" min="100" max="800" step="50" value="200">
+                </div>
+                <div class="slider-group" id="overlap-group" style="display: none;">
+                    <div class="slider-header">
+                        <label for="overlap-slider">Boundary Overlap</label>
+                        <span id="overlap-val">32 px</span>
+                    </div>
+                    <input type="range" id="overlap-slider" class="slider-input" min="16" max="64" step="8" value="32">
+                </div>
+            </div>
+
+            <!-- Execute button -->
+            <button id="run-btn" class="execute-btn" disabled>Execute AI Upscaling</button>
+        </div>
+
+        <!-- Right Viewer Panel -->
+        <div class="viewer-panel">
+            <!-- Tabs headers -->
+            <div class="tabs-header">
+                <button class="tab-link active" data-tab="tab-full">Full Image</button>
+                <button class="tab-link" data-tab="tab-comp" id="tab-link-comp" style="display: none;">Side-by-Side Detail</button>
+            </div>
+
+            <!-- Tab content: Full image -->
+            <div class="tab-content active" id="tab-full">
+                <img id="full-preview" class="preview-img" style="display: none;">
+                <div id="no-img-text" style="color: var(--text-secondary);">Select an image on the left to preview</div>
+            </div>
+
+            <!-- Tab content: Comparison -->
+            <div class="tab-content" id="tab-comp">
+                <div class="comparison-container">
+                    <div class="comp-pane">
+                        <span class="comp-title">Original (Center Crop)</span>
+                        <div class="comp-box">
+                            <img id="comp-orig" class="comp-img">
+                        </div>
+                    </div>
+                    <div class="comp-pane">
+                        <span class="comp-title" id="comp-upscaled-title">Upscaled 4x</span>
+                        <div class="comp-box">
+                            <img id="comp-upscaled" class="comp-img">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success download banner -->
+            <div class="download-box" id="download-banner">
+                <div class="download-info">
+                    <span class="download-title">🎉 Detail Reconstruction Complete!</span>
+                    <span class="download-meta" id="download-resolution">Resolution: - | Duration: -</span>
+                </div>
+                <a href="#" id="download-link" class="download-btn" download>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Download PNG
+                </a>
+            </div>
+
+            <!-- Loading overlay -->
+            <div class="loader-overlay" id="loading-overlay">
+                <div class="spinner"></div>
+                <div class="loader-text">AI detail reconstruction in progress...</div>
+                <div class="loader-status" id="load-status">Preparing dependencies...</div>
+                <div class="loader-timer" id="load-timer">00.00s</div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        Localhost Dashboard powered by FastAPI, OpenCV dnn_superres and Real-ESRGAN. Lossless PNG output.
+    </footer>
+
+    <script>
+        // DOM Elements
+        const imageSelect = document.getElementById('image-select');
+        const metaContainer = document.getElementById('meta-container');
+        const metaRes = document.getElementById('meta-res');
+        const metaRatio = document.getElementById('meta-ratio');
+        const metaFormat = document.getElementById('meta-format');
+        const algoSelect = document.getElementById('algo-select');
+        const scaleButtons = document.querySelectorAll('.scale-btn');
+        const advToggle = document.getElementById('adv-toggle');
+        const advPanel = document.getElementById('adv-panel');
+        const tileSlider = document.getElementById('tile-slider');
+        const tileVal = document.getElementById('tile-val');
+        const overlapSlider = document.getElementById('overlap-slider');
+        const overlapVal = document.getElementById('overlap-val');
+        const overlapGroup = document.getElementById('overlap-group');
+        const runBtn = document.getElementById('run-btn');
+        const fullPreview = document.getElementById('full-preview');
+        const noImgText = document.getElementById('no-img-text');
+        
+        const tabsLinks = document.querySelectorAll('.tab-link');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const tabLinkComp = document.getElementById('tab-link-comp');
+        
+        const compOrig = document.getElementById('comp-orig');
+        const compUpscaled = document.getElementById('comp-upscaled');
+        const compUpscaledTitle = document.getElementById('comp-upscaled-title');
+        
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadStatus = document.getElementById('load-status');
+        const loadTimer = document.getElementById('load-timer');
+        
+        const downloadBanner = document.getElementById('download-banner');
+        const downloadResolution = document.getElementById('download-resolution');
+        const downloadLink = document.getElementById('download-link');
+
+        // State Variables
+        let selectedScale = 4;
+        let imagesData = {};
+        let activeImage = null;
+        let timerInterval = null;
+
+        // Init: Load images
+        async function fetchImages() {
+            try {
+                const res = await fetch('/api/images');
+                const data = await res.json();
+                imagesData = data.images;
+                
+                imageSelect.innerHTML = '<option value="">-- Choose an Image --</option>';
+                Object.keys(imagesData).forEach(filename => {
+                    const option = document.createElement('option');
+                    option.value = filename;
+                    option.textContent = filename;
+                    imageSelect.appendChild(option);
+                });
+                
+                // Robust Auto-selection of the first available image
+                const filenames = Object.keys(imagesData);
+                if (filenames.length > 0) {
+                    let defaultFile = filenames[0];
+                    // Prefer GIS 1.png or image 6.png if present
+                    if (filenames.includes('GIS 1.png')) {
+                        defaultFile = 'GIS 1.png';
+                    } else if (filenames.includes('image 6.png')) {
+                        defaultFile = 'image 6.png';
+                    }
+                    imageSelect.value = defaultFile;
+                    handleImageChange(defaultFile);
+                }
+            } catch (err) {
+                console.error("Failed to load images", err);
+                imageSelect.innerHTML = '<option value="">Failed to load images</option>';
+            }
+        }
+
+        // Image selection change handler
+        function handleImageChange(filename) {
+            if (!filename) {
+                metaContainer.style.display = 'none';
+                fullPreview.style.display = 'none';
+                noImgText.style.display = 'block';
+                runBtn.disabled = true;
+                activeImage = null;
+                return;
+            }
+
+            activeImage = imagesData[filename];
+            
+            // Show metadata
+            metaRes.textContent = `${activeImage.width} x ${activeImage.height}`;
+            metaRatio.textContent = activeImage.ratio;
+            metaFormat.textContent = activeImage.format;
+            metaContainer.style.display = 'flex';
+            
+            // Set preview
+            fullPreview.src = `/gis_files/${filename}`;
+            fullPreview.style.display = 'block';
+            noImgText.style.display = 'none';
+            
+            runBtn.disabled = false;
+        }
+
+        imageSelect.addEventListener('change', (e) => {
+            handleImageChange(e.target.value);
+            // Hide previous results
+            downloadBanner.style.display = 'none';
+            tabLinkComp.style.display = 'none';
+            switchTab('tab-full');
+        });
+
+        // Algorithm change handler
+        algoSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            // Configure UI based on algorithm selected
+            if (val === 'realesrgan') {
+                overlapGroup.style.display = 'none';
+                tileSlider.min = 100;
+                tileSlider.max = 400;
+                tileSlider.value = 200;
+                tileVal.textContent = '200 px';
+                
+                // Real-ESRGAN supports 4x, 2x, 3x
+                updateScaleButtons([4, 2, 3]);
+            } else if (val === 'edsr' || val === 'fsrcnn') {
+                overlapGroup.style.display = 'flex';
+                tileSlider.min = 200;
+                tileSlider.max = 800;
+                tileSlider.value = 400;
+                tileVal.textContent = '400 px';
+                
+                // EDSR/FSRCNN supports 2x, 3x, 4x
+                updateScaleButtons([2, 3, 4]);
+            } else { // Lanczos
+                overlapGroup.style.display = 'none';
+                tileSlider.min = 100;
+                tileSlider.max = 800;
+                tileSlider.value = 400;
+                
+                // Lanczos supports any scale
+                updateScaleButtons([4, 2, 3]);
+            }
+        });
+
+        function updateScaleButtons(supportedScales) {
+            scaleButtons.forEach(btn => {
+                const s = parseInt(btn.dataset.scale);
+                if (supportedScales.includes(s)) {
+                    btn.style.display = 'block';
+                } else {
+                    btn.style.display = 'none';
+                }
+            });
+            // Auto click first available if current is hidden
+            if (!supportedScales.includes(selectedScale)) {
+                const nextBtn = document.querySelector(`.scale-btn[data-scale="${supportedScales[0]}"]`);
+                if (nextBtn) nextBtn.click();
+            }
+        }
+
+        // Scale button click handler
+        scaleButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                scaleButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedScale = parseInt(btn.dataset.scale);
+            });
+        });
+
+        // Advanced panel toggle
+        let advOpen = false;
+        advToggle.addEventListener('click', () => {
+            advOpen = !advOpen;
+            if (advOpen) {
+                advPanel.style.display = 'flex';
+                advToggle.textContent = '▼ Hide Advanced Parameters';
+            } else {
+                advPanel.style.display = 'none';
+                advToggle.textContent = '▶ Advanced Parameters (Tiling)';
+            }
+        });
+
+        tileSlider.addEventListener('input', (e) => {
+            tileVal.textContent = `${e.target.value} px`;
+        });
+
+        overlapSlider.addEventListener('input', (e) => {
+            overlapVal.textContent = `${e.target.value} px`;
+        });
+
+        // Tabs switcher
+        tabsLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                const tabId = link.dataset.tab;
+                switchTab(tabId);
+            });
+        });
+
+        function switchTab(tabId) {
+            tabsLinks.forEach(l => {
+                if (l.dataset.tab === tabId) l.classList.add('active');
+                else l.classList.remove('active');
+            });
+            tabContents.forEach(c => {
+                if (c.id === tabId) c.classList.add('active');
+                else c.classList.remove('active');
+            });
+        }
+
+        // Run Upscaling Execution
+        runBtn.addEventListener('click', async () => {
+            if (!imageSelect.value) return;
+            
+            // Show loader
+            loadingOverlay.style.display = 'flex';
+            downloadBanner.style.display = 'none';
+            
+            // Start timer
+            let elapsed = 0.0;
+            loadTimer.textContent = '0.00s';
+            loadStatus.textContent = 'Initializing engine and model verification...';
+            
+            timerInterval = setInterval(() => {
+                elapsed += 0.05;
+                loadTimer.textContent = `${elapsed.toFixed(2)}s`;
+                
+                // Dynamic fake/approximate loader text to keep user engaged
+                if (elapsed < 3) loadStatus.textContent = 'Checking GPU Vulkan dependencies & model files...';
+                else if (elapsed < 7) loadStatus.textContent = 'Loading weights & compiling execution graph...';
+                else if (elapsed < 15) loadStatus.textContent = 'Running Super-Resolution detail synthesis...';
+                else loadStatus.textContent = 'Splicing tiles and applying overlapping blends...';
+            }, 50);
+
+            const payload = {
+                filename: imageSelect.value,
+                method: algoSelect.value,
+                scale: selectedScale,
+                tile_size: parseInt(tileSlider.value),
+                overlap: parseInt(overlapSlider.value)
+            };
+
+            try {
+                const response = await fetch('/api/upscale', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                clearInterval(timerInterval);
+                loadingOverlay.style.display = 'none';
+
+                if (response.ok && result.success) {
+                    // Update main preview
+                    fullPreview.src = result.output_url;
+                    
+                    // Update side-by-side comparison previews
+                    compOrig.src = `/api/crop?filename=${encodeURIComponent(imageSelect.value)}&upscale=false`;
+                    compUpscaled.src = `/api/crop?filename=${encodeURIComponent(result.output_filename)}&upscale=true&scale=${selectedScale}`;
+                    compUpscaledTitle.textContent = `Upscaled ${selectedScale}x (${algoSelect.value.toUpperCase()})`;
+                    
+                    // Show tabs & download banner
+                    tabLinkComp.style.display = 'block';
+                    downloadResolution.textContent = `Output: ${result.new_width} x ${result.new_height} pixels | Duration: ${result.elapsed.toFixed(2)}s`;
+                    downloadLink.href = result.output_url;
+                    downloadLink.download = result.output_filename;
+                    downloadBanner.style.display = 'flex';
+                    
+                    // Auto switch to side-by-side tab to show off details
+                    switchTab('tab-comp');
+                } else {
+                    const errMsg = result.detail || result.error || "Unknown server error";
+                    alert(`Error upscaling image: ${errMsg}`);
+                }
+            } catch (err) {
+                clearInterval(timerInterval);
+                loadingOverlay.style.display = 'none';
+                console.error(err);
+                alert('A server error occurred during upscaling.');
+            }
+        });
+
+        // Load images on startup
+        fetchImages();
+    </script>
+</body>
+</html>
